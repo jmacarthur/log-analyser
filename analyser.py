@@ -50,17 +50,28 @@ def main():
             lines_with_numbers.append(token_numbers)
             for tn in token_numbers:
                 vivify(tn, 0, [token_counts, token_correlate_miss, token_correlate_hit])
-                token_counts[tn] += 1                
-                matches = (((c - date).total_seconds() < 10 and ((c-date).total_seconds()>=0)) for c in crash_events)
-                if any(matches):
-                    token_correlate_hit[tn] += 1
-                else:
-                    token_correlate_miss[tn] +=1
+                token_counts[tn] += 1
+                if date:
+                    matches = (((c - date).total_seconds() < 10 and ((c-date).total_seconds()>=0)) for c in crash_events)
+                    if any(matches):
+                        token_correlate_hit[tn] += 1
+                    else:
+                        token_correlate_miss[tn] +=1
 
+    most_unusual = 0
+    least_unusual = 999
     for line in lines_with_numbers:
         score = 0
         for tn in line:
             score += 1.0/token_counts[tn]
-        print("Score of line: %f correlation with crash: %f"%(score, token_correlate_hit[tn] / (token_correlate_hit[tn]+token_correlate_miss[tn])))
+        if score > most_unusual: most_unusual = score
+        if score < least_unusual: least_unusual = score
+        correlation = None
+        total_correlations = token_correlate_hit[tn]+token_correlate_miss[tn]
+        if total_correlations > 0:
+            print("Unusualness of line: %f. Correlation with crash: %f"%(score, token_correlate_hit[tn] / total_correlations))
+        else:
+            print("Unusualness of line: %f."%score)
+    print("Unusualness ranges from %f to %f."%(least_unusual, most_unusual))
         
 if __name__=="__main__": main()
