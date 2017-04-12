@@ -31,3 +31,9 @@ So, briefly, the requirements are:
 
 One potential way to approach this is to run the data through a data compression algorithm and look for the compression ratio. Commonly occurring data should compress very well, so adding a common line to a compressed file should not increase its size by much; a distinct line should increase it by more.
 
+# Example data
+
+The projects this tool was envisaged for were confidential software projects, and as such I can't provide any substantial portions of logs for them. Instead, there is a section of logfile for an old version of Android running in an emulator, in which I've caused Launcher to crash three times and also included another event which is intended to signal the impending reset. The indicator of the crash is this line:
+
+     04-12 17:37:17.233  1513  2319 E AndroidRuntime: *** FATAL EXCEPTION IN SYSTEM PROCESS: PowerManagerService.crash()
+
