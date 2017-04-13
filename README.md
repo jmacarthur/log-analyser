@@ -4,7 +4,7 @@ At Codethink we're often called in to help with projects that are running late o
 
 In these cases we often have log files produced by the system under test, and this is the only information we have to diagnose faults and suggest cures for the development team.
 
-    Input --> [ UNKNOWN SYSTEM ] --> Output and logs
+![Black box debugging](/tons-of-logs.png)
 
 Log files can be in any format. We attach directly to the serial port of a development board, so we get the usual output from the Linux kernel, and other proprietary messages. For example, this is an anonymised example from a recent project:
 
