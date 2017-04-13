@@ -2,11 +2,25 @@ import datetime
 import re
 import sys
 
-def strip_date(l):
-    g = re.match("^(\d\d\.\d\d\.\d\d\d\d \d\d:\d\d:\d\d\.\d+)",l)
+# Two forms of specifying the format for timestamps. Ideally, we'd just
+# use one, but the regex for is better for determining the length of
+# the timestamp.
+regex_timedate_formats = {
+    "Generic 1": r'^(\d\d\.\d\d\.\d\d\d\d \d\d:\d\d:\d\d\.\d+)',
+    "Android": r'^(\d\d-\d\d \d\d:\d\d:\d\d\.\d+)',
+}
+
+strptime_timedate_formats = {
+    "Generic 1": '%d.%m.%Y %H:%M:%S.%f',
+    "Android": '%m-%d %H:%M:%S.%f',
+}
+
+def strip_date(l, format_name = None):
+    if format_name == None: return (None, l)
+    g = re.match(regex_timedate_formats[format_name], l)
     if g:
-        datetime_object = datetime.datetime.strptime(g.group(1), '%d.%m.%Y %H:%M:%S.%f')
-        
+        format = strptime_timedate_formats[format_name]
+        datetime_object = datetime.datetime.strptime(g.group(1), format)
         return (datetime_object, l[len(g.group(1)):])
     else:
         return (None, l)
@@ -25,6 +39,26 @@ def vivify(key, val, list_of_dicts):
         if key in d: return
         d[key] = val
 
+def detect_time_format(f):
+    """ Read through the file and try to match all the date/time formats we know.
+        The first one to match ten times wins; that's what we'll take as the time
+        format for the whole log. The file pointer is rewound at the end. """
+    scores = {}
+    format = None
+    for k in regex_timedate_formats.keys(): scores[k] = 0
+    while True:
+        l = f.readline()
+        if l == "": break
+        for k in regex_timedate_formats.keys():
+            g = re.match(regex_timedate_formats[k], l)
+            if g:
+                scores[k] += 1
+                if scores[k] >= 10:
+                    format = k
+        if format: break
+    f.seek(0)
+    return format
+
 def main():
     if len(sys.argv)<2:
         print("Usage: analyser.py <logfile>")
@@ -37,11 +71,13 @@ def main():
     crash_events = [ datetime.datetime(2017, 2, 23, 12,11,43, 623300) ]
     
     with open(filename, "rt") as f:
+        timedate_format = detect_time_format(f)
+        print("Time and date format detected as %s"%(timedate_format))
         while True:
             l = f.readline()
             if l == "": break
             l = l.strip()
-            (date, l) = strip_date(l)
+            (date, l) = strip_date(l, timedate_format)
             tokens = l.split(" ")
             while '' in tokens:
                 tokens.remove('')
