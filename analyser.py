@@ -15,6 +15,18 @@ strptime_timedate_formats = {
     "Android": '%m-%d %H:%M:%S.%f',
 }
 
+# Setings
+""" report_correlation_threshold is the point at which lines are reported:
+    If this is at 0.7, then lines with correlation at or above 70% of the
+    range between minimum and maximum correlation are reported. """
+report_correlation_threshold = 0.5
+
+# Global variables
+known_tokens = []
+token_counts = {}
+token_correlate_hit = {}
+token_correlate_miss = {}
+
 def strip_date(l, format_name = None):
     if format_name == None: return (None, l)
     g = re.match(regex_timedate_formats[format_name], l)
@@ -25,7 +37,6 @@ def strip_date(l, format_name = None):
     else:
         return (None, l)
 
-known_tokens = []
 def lookup_tokens(token_list):
     global known_tokens
     token_numbers = []
@@ -59,20 +70,56 @@ def detect_time_format(f):
     f.seek(0)
     return format
 
+def is_crash_line(line, crash_labels):
+    return any(c in line for c in crash_labels)
+
+def find_crash_events(f, text_labels, timedate_format):
+    """ Run through f and search for lines which contain one of the labels.
+        Return a list of times when crashes are detected. """
+
+    # If we have no timedate format, we can't determine when crashes happen.
+    if timedate_format == None: return []
+
+    crash_events = []
+    while True:
+        l = f.readline()
+        if l == "": break
+        l = l.strip()
+        (date, l) = strip_date(l, timedate_format)
+        if is_crash_line(l, text_labels):
+            crash_events.append(date)
+    f.seek(0)
+    print("Crash events were detected at these times: " + ", ".join(map(str, crash_events)))
+    return crash_events
+
+def score_line(tokens):
+    global token_counts, token_correlate_hit, token_correlate_miss
+    score = 0
+    line_correlation = 0
+    for tn in tokens:
+        score += 1.0/token_counts[tn]
+        total_correlations = token_correlate_hit[tn]+token_correlate_miss[tn]
+        if total_correlations > 0:
+            correlation = (float(token_correlate_hit[tn]) / total_correlations)
+        else:
+            correlation = 0
+        # Adding up ratios like this feels wrong, but it will do for now
+        line_correlation += correlation
+    return (score, line_correlation)
+
 def main():
+    global token_counts, token_correlate_hit, token_correlate_miss
     if len(sys.argv)<2:
         print("Usage: analyser.py <logfile>")
         sys.exit(0)
     filename = sys.argv[1]
-    token_counts = {}
-    token_correlate_hit = {}
-    token_correlate_miss = {}
     lines_with_numbers = []
-    crash_events = [ datetime.datetime(2017, 2, 23, 12,11,43, 623300) ]
+    crash_text = [ "FATAL EXCEPTION IN SYSTEM PROCESS" ]
     
     with open(filename, "rt") as f:
         timedate_format = detect_time_format(f)
         print("Time and date format detected as %s"%(timedate_format))
+        crash_events = find_crash_events(f, crash_text, timedate_format)
         while True:
             l = f.readline()
             if l == "": break
@@ -88,7 +135,7 @@ def main():
                 vivify(tn, 0, [token_counts, token_correlate_miss, token_correlate_hit])
                 token_counts[tn] += 1
                 if date:
-                    matches = (((c - date).total_seconds() < 10 and ((c-date).total_seconds()>=0)) for c in crash_events)
+                    matches = (((c - date).total_seconds() < 20 and ((c-date).total_seconds()>=0)) for c in crash_events)
                     if any(matches):
                         token_correlate_hit[tn] += 1
                     else:
@@ -96,18 +143,28 @@ def main():
 
     most_unusual = 0
     least_unusual = 999
+    max_correlation = 0
+    min_correlation = 999
+
     for line in lines_with_numbers:
-        score = 0
-        for tn in line:
-            score += 1.0/token_counts[tn]
+        (score, line_correlation) = score_line(line)
         if score > most_unusual: most_unusual = score
         if score < least_unusual: least_unusual = score
-        correlation = None
-        total_correlations = token_correlate_hit[tn]+token_correlate_miss[tn]
-        if total_correlations > 0:
-            print("Unusualness of line: %f. Correlation with crash: %f"%(score, token_correlate_hit[tn] / total_correlations))
-        else:
-            print("Unusualness of line: %f."%score)
-    print("Unusualness ranges from %f to %f."%(least_unusual, most_unusual))
+        if line_correlation > max_correlation: max_correlation = line_correlation
+        if line_correlation < min_correlation: min_correlation = line_correlation
         
+    print("Unusualness ranges from %f to %f."%(least_unusual, most_unusual))
+    print("Correlation ranges from %f to %f."%(min_correlation, max_correlation))
+    absolute_correlation_threshold = ((1-report_correlation_threshold)*min_correlation +
+                                      report_correlation_threshold*max_correlation)
+
+    print("Reporting lines with correlation above %2.2f%% (%2.2f)" %
+          (report_correlation_threshold*100, absolute_correlation_threshold))
+    for line in lines_with_numbers:
+        (score, line_correlation) = score_line(line)
+        original_line = " ".join(known_tokens[x] for x in line)
+        if (line_correlation > absolute_correlation_threshold
+            and not is_crash_line(original_line, crash_text)):
+            print("[%2.2f/%2.2f] %s"%(score, line_correlation, original_line))
+
 if __name__=="__main__": main()
