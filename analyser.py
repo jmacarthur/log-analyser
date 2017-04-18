@@ -140,9 +140,22 @@ def score_line(tokens):
     return (score, line_correlation)
 
 
-def main():
+def update_token_stats(token, date, crash_events):
     global token_counts, token_correlate_hit, token_correlate_miss
-    if len(sys.argv)<2:
+    vivify(token, 0, [token_counts, token_correlate_miss, token_correlate_hit])
+    token_counts[token] += 1
+    if date:
+        matches = (((c - date).total_seconds() < 20 and
+                    ((c-date).total_seconds()>=0))
+                   for c in crash_events)
+        if any(matches):
+            token_correlate_hit[token] += 1
+        else:
+            token_correlate_miss[token] +=1
+
+
+def main():
+    if len(sys.argv) < 2:
         print("Usage: analyser.py <logfile>")
         sys.exit(0)
     filename = sys.argv[1]
@@ -154,24 +167,17 @@ def main():
         crash_events = find_crash_events(f, crash_text, timedate_format)
         while True:
             l = f.readline()
-            if l == "": break
+            if l == "":
+                break
             l = l.strip()
             (date, l) = strip_date(l, timedate_format)
             tokens = l.split(" ")
             while '' in tokens:
                 tokens.remove('')
             token_numbers = lookup_tokens(tokens)
-            #print("Tokenized line: %r"%token_numbers)
             lines_with_numbers.append(token_numbers)
             for tn in token_numbers:
-                vivify(tn, 0, [token_counts, token_correlate_miss, token_correlate_hit])
-                token_counts[tn] += 1
-                if date:
-                    matches = (((c - date).total_seconds() < 20 and ((c-date).total_seconds()>=0)) for c in crash_events)
-                    if any(matches):
-                        token_correlate_hit[tn] += 1
-                    else:
-                        token_correlate_miss[tn] +=1
+                update_token_stats(tn, date, crash_events)
 
     most_unusual = 0
     least_unusual = 999
