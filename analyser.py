@@ -1,6 +1,19 @@
+#!/usr/bin/env python
+
 import datetime
 import re
 import sys
+
+"""This is a very experimental program which attempts to locate
+interesting log lines in general log output. The only assumptions it
+makes about the log output is that lines start with a timestamp, and
+can be broken up into meaningful tokens separated by spaces. There are
+two formats known for timestamps, and more can be added. At the
+moment, the text indicating a crash is hardcoded.
+
+"""
+
+crash_text = ["FATAL EXCEPTION IN SYSTEM PROCESS"]
 
 # Two forms of specifying the format for timestamps. Ideally, we'd just
 # use one, but the regex for is better for determining the length of
@@ -27,8 +40,10 @@ token_counts = {}
 token_correlate_hit = {}
 token_correlate_miss = {}
 
-def strip_date(l, format_name = None):
-    if format_name == None: return (None, l)
+
+def strip_date(l, format_name=None):
+    if format_name is None:
+        return (None, l)
     g = re.match(regex_timedate_formats[format_name], l)
     if g:
         format = strptime_timedate_formats[format_name]
@@ -37,18 +52,23 @@ def strip_date(l, format_name = None):
     else:
         return (None, l)
 
+
 def lookup_tokens(token_list):
     global known_tokens
     token_numbers = []
     for t in token_list:
-        if t not in known_tokens: known_tokens.append(t)
+        if t not in known_tokens:
+            known_tokens.append(t)
         token_numbers.append(known_tokens.index(t))
     return token_numbers
 
+
 def vivify(key, val, list_of_dicts):
     for d in list_of_dicts:
-        if key in d: return
+        if key in d:
+            return
         d[key] = val
+
 
 def detect_time_format(f):
     """ Read through the file and try to match all the date/time formats we know.
@@ -56,7 +76,8 @@ def detect_time_format(f):
         format for the whole log. The file pointer is rewound at the end. """
     scores = {}
     format = None
-    for k in regex_timedate_formats.keys(): scores[k] = 0
+    for k in regex_timedate_formats.keys():
+        scores[k] = 0
     while True:
         l = f.readline()
         if l == "": break
@@ -70,8 +91,10 @@ def detect_time_format(f):
     f.seek(0)
     return format
 
+
 def is_crash_line(line, crash_labels):
     return any(c in line for c in crash_labels)
+
 
 def find_crash_events(f, text_labels, timedate_format):
     """ Run through f and search for lines which contain one of the labels.
@@ -92,6 +115,7 @@ def find_crash_events(f, text_labels, timedate_format):
     print("Crash events were detected at these times: " + ", ".join(map(str, crash_events)))
     return crash_events
 
+
 def score_line(tokens):
     global token_counts, token_correlate_hit, token_correlate_miss
     score = 0
@@ -107,6 +131,7 @@ def score_line(tokens):
         line_correlation += correlation
     return (score, line_correlation)
 
+
 def main():
     global token_counts, token_correlate_hit, token_correlate_miss
     if len(sys.argv)<2:
@@ -114,7 +139,6 @@ def main():
         sys.exit(0)
     filename = sys.argv[1]
     lines_with_numbers = []
-    crash_text = [ "FATAL EXCEPTION IN SYSTEM PROCESS" ]
     
     with open(filename, "rt") as f:
         timedate_format = detect_time_format(f)
