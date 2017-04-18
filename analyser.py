@@ -71,23 +71,28 @@ def vivify(key, val, list_of_dicts):
 
 
 def detect_time_format(f):
-    """ Read through the file and try to match all the date/time formats we know.
-        The first one to match ten times wins; that's what we'll take as the time
-        format for the whole log. The file pointer is rewound at the end. """
+    """Read through the file and try to match all the date/time formats
+        we know.  The first one to match ten times wins; that's what
+        we'll take as the time format for the whole log. The file
+        pointer is rewound at the end.
+
+    """
     scores = {}
     format = None
     for k in regex_timedate_formats.keys():
         scores[k] = 0
     while True:
         l = f.readline()
-        if l == "": break
+        if l == "":
+            break
         for k in regex_timedate_formats.keys():
             g = re.match(regex_timedate_formats[k], l)
             if g:
                 scores[k] += 1
                 if scores[k] >= 10:
                     format = k
-        if format: break
+        if format:
+            break
     f.seek(0)
     return format
 
@@ -101,18 +106,21 @@ def find_crash_events(f, text_labels, timedate_format):
         Return a list of times when crashes are detected. """
 
     # If we have no timedate format, we can't determine when crashes happen.
-    if timedate_format == None: return []
+    if timedate_format is None:
+        return []
 
     crash_events = []
     while True:
         l = f.readline()
-        if l == "": break
+        if l == "":
+            break
         l = l.strip()
         (date, l) = strip_date(l, timedate_format)
         if is_crash_line(l, text_labels):
             crash_events.append(date)
     f.seek(0)
-    print("Crash events were detected at these times: " + ", ".join(map(str, crash_events)))
+    print("Crash events were detected at these times: " +
+          ", ".join(map(str, crash_events)))
     return crash_events
 
 
