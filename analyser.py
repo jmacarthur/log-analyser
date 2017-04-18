@@ -45,6 +45,7 @@ class IntegerRange(object):
     def __init__(self):
         self.max = None
         self.min = None
+
     def record(self, value):
         if self.min is None or value < self.min:
             self.min = value
@@ -197,22 +198,25 @@ def main():
         (score, line_correlation) = score_line(line)
         unusualness_range.record(score)
         correlation_range.record(line_correlation)
-        
+
     print("Unusualness ranges from %f to %f." %
           (unusualness_range.min, unusualness_range.max))
     print("Correlation ranges from %f to %f." %
           (correlation_range.min, correlation_range.max))
 
-    absolute_correlation_threshold = ((1-report_correlation_threshold)*correlation_range.min +
-                                      report_correlation_threshold*correlation_range.max)
+    absolute_correlation_threshold = (
+        (1-report_correlation_threshold)*correlation_range.min +
+        report_correlation_threshold*correlation_range.max)
 
     print("Reporting lines with correlation above %2.2f%% (%2.2f)" %
           (report_correlation_threshold*100, absolute_correlation_threshold))
     for line in lines_with_numbers:
         (score, line_correlation) = score_line(line)
         original_line = " ".join(known_tokens[x] for x in line)
-        if (line_correlation > absolute_correlation_threshold
-            and not is_crash_line(original_line, crash_text)):
-            print("[%2.2f/%2.2f] %s"%(score, line_correlation, original_line))
+        if (line_correlation > absolute_correlation_threshold and
+            not is_crash_line(original_line, crash_text)):   # nopep8
+            print("[%2.2f/%2.2f] %s" %
+                  (score, line_correlation, original_line))
 
-if __name__=="__main__": main()
+if __name__ == "__main__":
+    main()
