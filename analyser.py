@@ -41,6 +41,17 @@ token_correlate_hit = {}
 token_correlate_miss = {}
 
 
+class IntegerRange(object):
+    def __init__(self):
+        self.max = None
+        self.min = None
+    def record(self, value):
+        if self.min is None or value < self.min:
+            self.min = value
+        if self.max is None or value > self.max:
+            self.max = value
+
+
 def strip_date(l, format_name=None):
     if format_name is None:
         return (None, l)
@@ -145,13 +156,13 @@ def update_token_stats(token, date, crash_events):
     vivify(token, 0, [token_counts, token_correlate_miss, token_correlate_hit])
     token_counts[token] += 1
     if date:
-        matches = (((c - date).total_seconds() < 20 and
-                    ((c-date).total_seconds()>=0))
-                   for c in crash_events)
+        time_deltas = ((c - date).total_seconds() for c in crash_events)
+        matches = (time_delta >= 0 and time_delta < 20
+                   for time_delta in time_deltas)
         if any(matches):
             token_correlate_hit[token] += 1
         else:
-            token_correlate_miss[token] +=1
+            token_correlate_miss[token] += 1
 
 
 def main():
@@ -160,10 +171,10 @@ def main():
         sys.exit(0)
     filename = sys.argv[1]
     lines_with_numbers = []
-    
+
     with open(filename, "rt") as f:
         timedate_format = detect_time_format(f)
-        print("Time and date format detected as %s"%(timedate_format))
+        print("Time and date format detected as %s" % timedate_format)
         crash_events = find_crash_events(f, crash_text, timedate_format)
         while True:
             l = f.readline()
@@ -179,22 +190,21 @@ def main():
             for tn in token_numbers:
                 update_token_stats(tn, date, crash_events)
 
-    most_unusual = 0
-    least_unusual = 999
-    max_correlation = 0
-    min_correlation = 999
+    unusualness_range = IntegerRange()
+    correlation_range = IntegerRange()
 
     for line in lines_with_numbers:
         (score, line_correlation) = score_line(line)
-        if score > most_unusual: most_unusual = score
-        if score < least_unusual: least_unusual = score
-        if line_correlation > max_correlation: max_correlation = line_correlation
-        if line_correlation < min_correlation: min_correlation = line_correlation
+        unusualness_range.record(score)
+        correlation_range.record(line_correlation)
         
-    print("Unusualness ranges from %f to %f."%(least_unusual, most_unusual))
-    print("Correlation ranges from %f to %f."%(min_correlation, max_correlation))
-    absolute_correlation_threshold = ((1-report_correlation_threshold)*min_correlation +
-                                      report_correlation_threshold*max_correlation)
+    print("Unusualness ranges from %f to %f." %
+          (unusualness_range.min, unusualness_range.max))
+    print("Correlation ranges from %f to %f." %
+          (correlation_range.min, correlation_range.max))
+
+    absolute_correlation_threshold = ((1-report_correlation_threshold)*correlation_range.min +
+                                      report_correlation_threshold*correlation_range.max)
 
     print("Reporting lines with correlation above %2.2f%% (%2.2f)" %
           (report_correlation_threshold*100, absolute_correlation_threshold))
